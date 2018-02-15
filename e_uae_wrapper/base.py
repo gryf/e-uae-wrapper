@@ -3,18 +3,23 @@ Base class for all wrapper modules
 """
 import logging
 import os
+import re
 import shutil
 import sys
 import tempfile
 
 from e_uae_wrapper import utils
 from e_uae_wrapper import path
+from e_uae_wrapper import WRAPPER_KEY
 
 
 class Base(object):
     """
     Base class for wrapper modules
     """
+
+    CONF_RE = re.compile(r'[^{]*(?P<template>{{(?P<replace>[^}]+)}})')
+
     def __init__(self, conf_file, config):
         """
         Params:
@@ -24,6 +29,7 @@ class Base(object):
         self.dir = None
         self.save_filename = None
         self.conf_file = conf_file
+        self.conf_path = os.path.dirname(os.path.abspath(conf_file))
 
     def run(self):
         """
@@ -41,7 +47,7 @@ class Base(object):
 
         self.dir = tempfile.mkdtemp()
         self._interpolate_options()
-        self._set_assets_paths()
+        # self._set_assets_paths()
 
         return True
 
@@ -68,9 +74,14 @@ class Base(object):
 
     def _copy_conf(self):
         """copy provided configuration as .uaerc"""
-        shutil.copy(self.conf_file, self.dir)
-        os.rename(os.path.join(self.dir, os.path.basename(self.conf_file)),
-                  os.path.join(self.dir, '.uaerc'))
+        curdir = os.path.abspath('.')
+        os.chdir(self.dir)
+
+        with open(os.path.join(self.dir, '.uaerc'), 'w') as fobj:
+            for key, val in self.config.items():
+                fobj.write('%s=%s\n' % (key, val))
+
+        os.chdir(curdir)
         return True
 
     def _run_emulator(self):
@@ -167,8 +178,20 @@ class Base(object):
         Search and replace values for options which contains {{ and  }}
         markers for replacing them with correpsonding calculated values
         """
+        updated_conf = {}
         for key, val in self.config.items():
-            print key, val
+
+            if key.startswith(WRAPPER_KEY):
+                continue
+            if '{{' + WRAPPER_KEY in val:
+                match = Base.CONF_RE.match(val)
+                replace = match.group('replace')
+                template = match.group('template')
+                updated_conf[key] = val.replace(template,
+                                                self.config.get(replace, ''))
+
+        if updated_conf:
+            self.config.update(updated_conf)
 
     def _validate_options(self):
         """Validate mandatory options"""
@@ -205,7 +228,8 @@ class ArchiveBase(Base):
             config:  is config dictionary created out of config file
         """
         super(ArchiveBase, self).__init__(conf_path, config)
-        self.arch_filepath = None
+        self.arch_filepath = os.path.join(self.conf_path,
+                                          config.get('wrapper_archive', ''))
 
     def _set_assets_paths(self):
         """
@@ -214,7 +238,7 @@ class ArchiveBase(Base):
         """
         super(ArchiveBase, self)._set_assets_paths()
 
-        conf_abs_dir = os.path.dirname(os.path.abspath(self.conf_file))
+        conf_abs_dir = os.path.dirname(self.conf_file)
         arch = self.config.get('wrapper_archive')
         if arch:
             if os.path.isabs(arch):

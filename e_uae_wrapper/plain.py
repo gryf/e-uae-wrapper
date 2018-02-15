@@ -15,6 +15,9 @@ class Wrapper(base.Base):
         """
         Main function which run e-uae
         """
+        if not self._copy_conf():
+            return False
+
         self._run_emulator()
 
     def _run_emulator(self):

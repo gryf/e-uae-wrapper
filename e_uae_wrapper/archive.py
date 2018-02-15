@@ -53,7 +53,7 @@ class Wrapper(base.ArchiveBase):
         """
         Produce archive and save it back. Than remove old one.
         """
-        if self.all_options.get('wrapper_persist_data', '0') != '1':
+        if self.config.get('wrapper_persist_data', '0') != '1':
             return True
 
         curdir = os.path.abspath('.')
@@ -62,7 +62,7 @@ class Wrapper(base.ArchiveBase):
         saves = self._get_saves_dir()
         if saves:
             shutil.rmtree(saves)
-        os.unlink('Config.e-uae')
+        os.unlink('.uaerc')
 
         title = self._get_title()
 
