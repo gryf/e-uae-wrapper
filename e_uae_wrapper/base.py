@@ -45,7 +45,7 @@ class Base(object):
         if not self._validate_options():
             return False
 
-        self.dir = tempfile.mkdtemp()
+        self.config['wrapper_tmp_dir'] = self.dir = tempfile.mkdtemp()
         self._interpolate_options()
         # self._set_assets_paths()
 
