@@ -35,19 +35,22 @@ class Base(object):
         """
         Main function which accepts config file for e-uae
         It will do as follows:
-            - set needed full path for asset files
-            - extract archive file
+            - set needed paths for templates
+            - validate options
+            - [extract archive file]
             - copy configuration
-            - [copy save if exists]
             - run the emulation
-            - archive save state
         """
+
+        self.config['wrapper_tmp_dir'] = self.dir = tempfile.mkdtemp()
+        self.config['wrapper_config_path'] = self.conf_path
+        self._interpolate_options()
+
         if not self._validate_options():
             return False
 
-        self.config['wrapper_tmp_dir'] = self.dir = tempfile.mkdtemp()
-        self._interpolate_options()
-        # self._set_assets_paths()
+        if not self._copy_conf():
+            return False
 
         return True
 
