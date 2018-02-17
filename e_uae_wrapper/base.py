@@ -60,21 +60,6 @@ class Base(object):
             shutil.rmtree(self.dir)
         return
 
-    def _set_assets_paths(self):
-        """
-        Set full paths for archive file (without extension) and for save state
-        archive file
-        """
-        conf_abs_dir = os.path.dirname(os.path.abspath(self.conf_file))
-        conf_base = os.path.basename(self.conf_file)
-        conf_base = os.path.splitext(conf_base)[0]
-
-        # set optional save_state
-        arch_ext = utils.get_arch_ext(self.config.get('wrapper_archiver'))
-        if arch_ext:
-            self.save_filename = os.path.join(conf_abs_dir, conf_base +
-                                              '_save' + arch_ext)
-
     def _copy_conf(self):
         """copy provided configuration as .uaerc"""
         curdir = os.path.abspath('.')
@@ -107,74 +92,6 @@ class Base(object):
             if not title:
                 title = self.config['wrapper_archive']
         return title
-
-    def _save_save(self):
-        """
-        Get the saves from emulator and store it where configuration is placed
-        """
-        if self.config.get('wrapper_save_state', '0') != '1':
-            return True
-
-        os.chdir(self.dir)
-        save_path = self._get_saves_dir()
-        if not save_path:
-            return True
-
-        if os.path.exists(self.save_filename):
-            os.unlink(self.save_filename)
-
-        curdir = os.path.abspath('.')
-
-        if not utils.create_archive(self.save_filename, '', [save_path]):
-            logging.error('Error: archiving save state failed.')
-            os.chdir(curdir)
-            return False
-
-        os.chdir(curdir)
-        return True
-
-    def _load_save(self):
-        """
-        Put the saves (if exists) to the temp directory.
-        """
-        if self.config.get('wrapper_save_state', '0') != '1':
-            return True
-
-        if not os.path.exists(self.save_filename):
-            return True
-
-        curdir = os.path.abspath('.')
-        os.chdir(self.dir)
-        utils.extract_archive(self.save_filename)
-        os.chdir(curdir)
-        return True
-
-    def _get_saves_dir(self):
-        """
-        Return path to save state directory or None in cases:
-            - there is no save state dir set relative to copied config file
-            - save state dir is set globally
-            - save state dir is set relative to the config file
-            - save state dir doesn't exists
-        Note, that returned path is relative not absolute
-        """
-        if not self.config.get('save_states_dir'):
-            return None
-
-        if self.config['save_states_dir'].startswith('$WRAPPER') and \
-           '..' not in self.config['save_states_dir']:
-            save = self.config['save_states_dir'].replace('$WRAPPER/', '')
-        else:
-            return None
-
-        save_path = os.path.join(self.dir, save)
-        if not os.path.exists(save_path) or not os.path.isdir(save_path):
-            return None
-
-        if save.endswith('/'):
-            save = save[:-1]
-
-        return save
 
     def _interpolate_options(self):
         """

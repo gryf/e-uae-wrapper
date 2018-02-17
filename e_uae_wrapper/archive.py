@@ -35,17 +35,11 @@ class Wrapper(base.ArchiveBase):
         if not self._extract():
             return False
 
-        self._load_save()
-
         if not self._copy_conf():
             return False
 
         if not self._run_emulator():
             return False
-
-        if self._get_saves_dir():
-            if not self._save_save():
-                return False
 
         return self._make_archive()
 
@@ -59,9 +53,6 @@ class Wrapper(base.ArchiveBase):
         curdir = os.path.abspath('.')
         os.chdir(self.dir)
 
-        saves = self._get_saves_dir()
-        if saves:
-            shutil.rmtree(saves)
         os.unlink('.uaerc')
 
         title = self._get_title()
