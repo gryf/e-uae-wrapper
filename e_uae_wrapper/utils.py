@@ -106,10 +106,16 @@ def _get_common_config():
     try:
         parser.read(conf_path)
     except configparser.ParsingError:
-        # Configuration syntax is wrong
+        logging.warning("Configuration is in wrong ini format and cannot be"
+                        " parsed.")
         return {}
 
-    section = parser.sections()[0]
+    try:
+        section = parser.sections()[0]
+    except IndexError:
+        logging.warning("Configuration lacks of required section.")
+        return {}
+
     conf = collections.OrderedDict()
     for option in parser.options(section):
         if option in ['wrapper_rom_path']:
