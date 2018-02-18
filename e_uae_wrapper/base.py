@@ -18,7 +18,7 @@ class Base(object):
     Base class for wrapper modules
     """
 
-    CONF_RE = re.compile(r'[^{]*(?P<template>{{(?P<replace>[^}]+)}})')
+    CONF_RE = re.compile(r'[^{]*{{(?P<replace>[^}]+)}}')
 
     def __init__(self, conf_file, config):
         """
@@ -42,7 +42,7 @@ class Base(object):
             - run the emulation
         """
 
-        self.config['wrapper_tmp_dir'] = self.dir = tempfile.mkdtemp()
+        self.config['wrapper_tmp_path'] = self.dir = tempfile.mkdtemp()
         self.config['wrapper_config_path'] = self.conf_path
         self._interpolate_options()
 
@@ -93,6 +93,29 @@ class Base(object):
                 title = self.config['wrapper_archive']
         return title
 
+    def _calculate_path(self, val, fs=False):
+        """
+        Make absoulte path by splitting the val with '{{replace}}' and by
+        adding right value for replace from config.
+        """
+        start = end = ''
+        if fs:
+            # a special case for hardrive definition
+            start = val[:val.index('HD:') + 3]
+            end = ',0' if val.endswith(',0') else ''
+            val = val[val.index('HD:') + 3:]
+            if end:
+                val = val[:-2]
+
+        path_list = [x for y in val.split('{{') for x in y.split('}}')]
+        for index, item in enumerate(path_list):
+            if item in self.config:
+                path_list[index] = self.config[item]
+
+        path = os.path.abspath(os.path.join(*path_list))
+
+        return "%s%s%s" % (start, path, end)
+
     def _interpolate_options(self):
         """
         Search and replace values for options which contains {{ and  }}
@@ -103,12 +126,23 @@ class Base(object):
 
             if key.startswith(WRAPPER_KEY):
                 continue
+
+            fs = key.startswith('filesystem')
+
             if '{{' + WRAPPER_KEY in val:
                 match = Base.CONF_RE.match(val)
+                if not match:
+                    logging.warning("Possible error in configuration file on "
+                                    "key %s.", key)
+                    continue
+
                 replace = match.group('replace')
-                template = match.group('template')
-                updated_conf[key] = val.replace(template,
-                                                self.config.get(replace, ''))
+                if 'path' in replace:
+                    updated_conf[key] = self._calculate_path(val, fs)
+                else:
+                    updated_conf[key] = val.replace("{{%s}}" % replace,
+                                                    self.config.get(replace,
+                                                                    ''))
 
         if updated_conf:
             self.config.update(updated_conf)
