@@ -13,6 +13,9 @@ except ImportError:
 from e_uae_wrapper import file_archive
 
 
+DUP_KEYS = ['filesystem', 'filesystem2', 'hardfile', 'hardfile2']
+
+
 def load_conf(conf_file):
     """
     Read global config and provided config file and return dict with combined
@@ -23,9 +26,15 @@ def load_conf(conf_file):
     with open(conf_file) as fobj:
         for line in fobj:
             key, val = line.strip().split('=')
-            if key in local_conf:
+            if key in DUP_KEYS:
+                try:
+                    local_conf[key].append(val)
+                except KeyError:
+                    local_conf[key] = [val]
+            elif key in local_conf:
                 raise Exception('%s already in conf' % key)
-            local_conf[key] = val
+            else:
+                local_conf[key] = val
 
     conf.update(local_conf)
     return conf

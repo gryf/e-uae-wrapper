@@ -67,7 +67,11 @@ class Base(object):
 
         with open(os.path.join(self.dir, '.uaerc'), 'w') as fobj:
             for key, val in self.config.items():
-                fobj.write('%s=%s\n' % (key, val))
+                if isinstance(val, list):
+                    for subval in val:
+                        fobj.write('%s=%s\n' % (key, subval))
+                else:
+                    fobj.write('%s=%s\n' % (key, val))
 
         os.chdir(curdir)
         return True
@@ -93,28 +97,44 @@ class Base(object):
                 title = self.config['wrapper_archive']
         return title
 
-    def _calculate_path(self, val, fs=False):
+    def _calculate_path(self, value):
         """
         Make absoulte path by splitting the val with '{{replace}}' and by
         adding right value for replace from config.
         """
-        start = end = ''
-        if fs:
-            # a special case for hardrive definition
-            start = val[:val.index('HD:') + 3]
-            end = ',0' if val.endswith(',0') else ''
-            val = val[val.index('HD:') + 3:]
-            if end:
-                val = val[:-2]
+        if not isinstance(value, list):
+            value = [value]
 
+        result = []
+        for val in value:
+            if '{{' not in val:
+                result.append(val)
+                continue
+
+            if 'path' not in val:
+                match = Base.CONF_RE.match(val)
+                replace = match.group('replace')
+                result.append(val.replace("{{%s}}" % replace,
+                                          self.config.get(replace, '')))
+                continue
+
+            for item in re.split('[,:]', val):
+                if '{{' in item:
+                    path = self._get_abspath(item)
+                    result.append(val.replace(item, path))
+                    break
+
+        if len(value) == 1:
+            return result[0]
+        return result
+
+    def _get_abspath(self, val):
         path_list = [x for y in val.split('{{') for x in y.split('}}')]
         for index, item in enumerate(path_list):
             if item in self.config:
                 path_list[index] = self.config[item]
 
-        path = os.path.abspath(os.path.join(*path_list))
-
-        return "%s%s%s" % (start, path, end)
+        return os.path.abspath(os.path.join(*path_list))
 
     def _interpolate_options(self):
         """
@@ -127,10 +147,12 @@ class Base(object):
             if key.startswith(WRAPPER_KEY):
                 continue
 
-            fs = key.startswith('filesystem')
+            check_val = val
+            if isinstance(val, list):
+                check_val = " ".join(check_val)
 
-            if '{{' + WRAPPER_KEY in val:
-                match = Base.CONF_RE.match(val)
+            if '{{' + WRAPPER_KEY in check_val:
+                match = Base.CONF_RE.match(check_val)
                 if not match:
                     logging.warning("Possible error in configuration file on "
                                     "key %s.", key)
@@ -138,7 +160,7 @@ class Base(object):
 
                 replace = match.group('replace')
                 if 'path' in replace:
-                    updated_conf[key] = self._calculate_path(val, fs)
+                    updated_conf[key] = self._calculate_path(val)
                 else:
                     updated_conf[key] = val.replace("{{%s}}" % replace,
                                                     self.config.get(replace,
